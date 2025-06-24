@@ -1,15 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
+  const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Logging in with:", { email, password });
+
+    // Dummy test credentials
+    const testEmail = "test@edugo.com";
+    const testPassword = "password123";
+
+    if (email === testEmail && password === testPassword) {
+      // Clear error and redirect to bookings
+      setError("");
+      router.push("/bookings");
+    } else {
+      // Show error message
+      setError("Invalid email or password. Try test@edugo.com / password123");
+    }
   };
 
   return (
@@ -43,10 +58,12 @@ export default function Home() {
             className="w-full mb-2 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
 
+          {error && <p className="text-red-600 text-sm mb-4">{error}</p>}
+
           <div className="text-right mb-6">
-            <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+            <a href="/forgot-password" className="text-sm text-blue-600 hover:underline">
               Forgot password?
-            </Link>
+            </a>
           </div>
 
           <button
