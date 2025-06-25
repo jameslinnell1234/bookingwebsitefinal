@@ -1,23 +1,20 @@
 export default function ForgotPasswordPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="bg-white p-8 rounded shadow-md max-w-md w-full">
-        <h2 className="text-2xl font-bold mb-4 text-center">Reset Your Password</h2>
-        <p className="text-center text-gray-600 mb-6">
-          Enter your email below and we’ll send you a reset link (coming soon).
+    <main className="flex items-center justify-center min-h-screen bg-gray-50">
+      <div className="w-full max-w-sm p-6 bg-white shadow-md rounded">
+        <h1 className="text-2xl font-bold mb-4 text-center">Reset Password</h1>
+        <p className="mb-4 text-sm text-gray-600 text-center">
+          Enter your email and we’ll send you a reset link (not functional yet).
         </p>
-
-        <form>
+        <form className="space-y-4">
           <input
             type="email"
-            placeholder="Email address"
-            className="w-full mb-4 px-4 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-            disabled
+            placeholder="Email"
+            className="w-full p-2 border rounded border-gray-300"
           />
           <button
             type="submit"
-            disabled
-            className="w-full bg-blue-400 text-white py-2 rounded opacity-50 cursor-not-allowed"
+            className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700"
           >
             Send Reset Link
           </button>
