@@ -2,17 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { addBooking } from "@/lib/firestore";
+import { addDoc, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function CreateBookingPage() {
   const router = useRouter();
+
   const [form, setForm] = useState({
-    vanSize: "",       // changed from vanPlate
+    vanSize: "",
     date: "",
     startTime: "",
     endTime: "",
     userInitials: "",
   });
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -22,27 +25,29 @@ export default function CreateBookingPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
+    setError("");
 
-    // Basic validation
-    if (
-      !form.vanSize ||
-      !form.date ||
-      !form.startTime ||
-      !form.endTime ||
-      !form.userInitials
-    ) {
-      setError("Please fill in all fields.");
+    if (!form.vanSize || !form.date || !form.userInitials) {
+      setError("Please fill in van size, date, and your initials.");
       setLoading(false);
       return;
     }
 
     try {
-      await addBooking(form);
+      await addDoc(collection(db, "bookings"), {
+        vanSize: form.vanSize,
+        date: form.date,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        userInitials: form.userInitials.toUpperCase(),
+      });
+
       router.push("/bookings");
-    } catch (err) {
-      setError("Failed to create booking.");
+    } catch (error) {
+      setError("Failed to create booking. Please try again.");
+      console.error("Error adding booking: ", error);
+    } finally {
       setLoading(false);
     }
   };
