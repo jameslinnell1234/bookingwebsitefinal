@@ -11,12 +11,11 @@ import { db } from "./firebase";
 import { format } from "date-fns";
 
 export type Booking = {
-  id: string;
+  id: string; // Firestore doc ID
   vanSize: "large" | "small";
-  date: string;
+  date: string; // Format: "YYYY-MM-DD"
   userInitials: string;
-  startTime?: string;
-  endTime?: string;
+  timeSlot: string; // NEW: e.g., "10:00 - 11:00"
 };
 
 export async function getBookingsForMonthRange(start: Date, end: Date): Promise<Booking[]> {
@@ -31,19 +30,19 @@ export async function getBookingsForMonthRange(start: Date, end: Date): Promise<
     where("date", "<=", endStr)
   );
 
-  const querySnapshot = await getDocs(q);
+  const snapshot = await getDocs(q);
 
   const bookings: Booking[] = [];
 
-  querySnapshot.forEach((docSnap) => {
-    const data = docSnap.data();
+  snapshot.forEach((doc) => {
+    const data = doc.data();
+
     bookings.push({
-      id: docSnap.id,
-      vanSize: data.vanSize,
+      id: doc.id, // <-- this should work fine
       date: data.date,
+      vanSize: data.vanSize,
       userInitials: data.userInitials,
-      startTime: data.startTime,
-      endTime: data.endTime,
+      timeSlot: data.timeSlot || "", // fallback if field is missing
     });
   });
 

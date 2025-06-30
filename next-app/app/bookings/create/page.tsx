@@ -1,23 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react"; // ✅ added useEffect here
 import { useRouter } from "next/navigation";
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, query, where, getDocs } from "firebase/firestore"; // ✅ added query, where, getDocs
 import { db } from "@/lib/firebase";
 
 export default function CreateBookingPage() {
   const router = useRouter();
+  const [unavailableSlots, setUnavailableSlots] = useState<string[]>([]);
 
   const [form, setForm] = useState({
     vanSize: "",
     date: "",
-    startTime: "",
-    endTime: "",
+    timeSlot: "",
     userInitials: "",
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  
+  useEffect(() => {
+    const fetchUnavailableSlots = async () => {
+      if (!form.date || !form.vanSize) {
+        setUnavailableSlots([]);
+        return;
+      }
+
+      const q = query(
+        collection(db, "bookings"),
+        where("date", "==", form.date),
+        where("vanSize", "==", form.vanSize)
+      );
+
+      const snapshot = await getDocs(q);
+      const slots = snapshot.docs.map((doc) => doc.data().timeSlot);
+      setUnavailableSlots(slots);
+    };
+
+    fetchUnavailableSlots();
+  }, [form.date, form.vanSize]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -38,10 +59,10 @@ export default function CreateBookingPage() {
       await addDoc(collection(db, "bookings"), {
         vanSize: form.vanSize,
         date: form.date,
-        startTime: form.startTime,
-        endTime: form.endTime,
+        timeSlot: form.timeSlot,
         userInitials: form.userInitials.toUpperCase(),
       });
+
 
       router.push("/bookings");
     } catch (error) {
@@ -56,6 +77,7 @@ export default function CreateBookingPage() {
     <main className="max-w-md mx-auto p-6">
       <h1 className="text-2xl font-bold mb-6">Create Booking</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Van size select (unchanged) */}
         <div>
           <label htmlFor="vanSize" className="block font-medium mb-1">
             Select Van Size
@@ -73,6 +95,7 @@ export default function CreateBookingPage() {
           </select>
         </div>
 
+        {/* Date picker input */}
         <div>
           <label htmlFor="date" className="block font-medium mb-1">
             Date
@@ -87,34 +110,41 @@ export default function CreateBookingPage() {
           />
         </div>
 
+        {/* Time slot dropdown */}
         <div>
-          <label htmlFor="startTime" className="block font-medium mb-1">
-            Start Time
+          <label htmlFor="timeSlot" className="block font-medium mb-1">
+            Time Slot
           </label>
-          <input
-            type="time"
-            name="startTime"
-            id="startTime"
-            value={form.startTime}
+          <select
+            name="timeSlot"
+            id="timeSlot"
+            value={form.timeSlot}
             onChange={handleChange}
             className="w-full border px-3 py-2 rounded"
-          />
+          >
+            <option value="">-- Select Time Slot --</option>
+            {[
+              "07:00-08:00",
+              "08:00-09:00",
+              "09:00-10:00",
+              "10:00-11:00",
+              "11:00-12:00",
+              "12:00-13:00",
+              "13:00-14:00",
+              "14:00-15:00",
+              "15:00-16:00",
+              "16:00-17:00",
+              "17:00-18:00",
+              "18:00-19:00",
+            ].map((slot) => (
+              <option key={slot} value={slot} disabled={unavailableSlots.includes(slot)} style={unavailableSlots.includes(slot) ? { color: "red" } : {}}>
+                {slot.replace("-", " - ")}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div>
-          <label htmlFor="endTime" className="block font-medium mb-1">
-            End Time
-          </label>
-          <input
-            type="time"
-            name="endTime"
-            id="endTime"
-            value={form.endTime}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-          />
-        </div>
-
+        {/* User initials input (unchanged) */}
         <div>
           <label htmlFor="userInitials" className="block font-medium mb-1">
             Your Initials
@@ -131,8 +161,7 @@ export default function CreateBookingPage() {
           />
         </div>
 
-        {error && <p className="text-red-600">{error}</p>}
-
+        {/* Submit button */}
         <button
           type="submit"
           disabled={loading}
@@ -141,6 +170,7 @@ export default function CreateBookingPage() {
           {loading ? "Creating..." : "Create Booking"}
         </button>
       </form>
+
     </main>
   );
 }

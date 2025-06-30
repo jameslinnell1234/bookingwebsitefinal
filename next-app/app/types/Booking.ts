@@ -1,7 +1,7 @@
 export type Booking = {
+  id: string; // Firestore doc ID
   vanSize: "large" | "small";
-  date: string;      // format: "YYYY-MM-DD"
-  startTime: string; // e.g. "15:00"
-  endTime: string;   // e.g. "18:00"
+  date: string; // Format: "YYYY-MM-DD"
   userInitials: string;
+  timeSlot: string; // NEW: e.g., "10:00 - 11:00"
 };
