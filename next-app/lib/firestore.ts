@@ -10,13 +10,36 @@ import {
 import { db } from "./firebase";
 import { format } from "date-fns";
 
+
+
 export type Booking = {
-  id: string; // Firestore doc ID
-  vanSize: "large" | "small";
-  date: string; // Format: "YYYY-MM-DD"
+  id: string;
+  vanSize: "small" | "large";
+  date: string;
   userInitials: string;
-  timeSlot: string; // NEW: e.g., "10:00 - 11:00"
+  timeSlots: string[]; // ← no more timeSlot
 };
+
+export async function getBookingsForDate(date: string): Promise<Booking[]> {
+  const bookingsRef = collection(db, "bookings");
+  const q = query(bookingsRef, where("date", "==", date));
+  const snapshot = await getDocs(q);
+
+  const bookings: Booking[] = [];
+
+  snapshot.forEach((doc) => {
+    const data = doc.data();
+    bookings.push({
+      id: doc.id,
+      vanSize: data.vanSize,
+      date: data.date,
+      userInitials: data.userInitials,
+      timeSlots: data.timeSlots,
+    });
+  });
+
+  return bookings;
+}
 
 export async function getBookingsForMonthRange(start: Date, end: Date): Promise<Booking[]> {
   const bookingsRef = collection(db, "bookings");
@@ -38,18 +61,25 @@ export async function getBookingsForMonthRange(start: Date, end: Date): Promise<
     const data = doc.data();
 
     bookings.push({
-      id: doc.id, // <-- this should work fine
+      id: doc.id,
       date: data.date,
       vanSize: data.vanSize,
       userInitials: data.userInitials,
-      timeSlot: data.timeSlot || "", // fallback if field is missing
+      
+      timeSlots: data.timeSlots || [],
     });
   });
 
   return bookings;
 }
 
-export async function addBooking(booking: Omit<Booking, "id">): Promise<void> {
+export async function createBooking(booking: {
+  vanSize: "large" | "small";
+  date: string;
+  userInitials: string;
+  
+  timeSlots?: string[];
+}): Promise<void> {
   const bookingsRef = collection(db, "bookings");
   await addDoc(bookingsRef, booking);
 }

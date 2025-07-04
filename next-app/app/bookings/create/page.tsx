@@ -1,176 +1,212 @@
 "use client";
 
-import { useState, useEffect } from "react"; // ✅ added useEffect here
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDoc, collection, query, where, getDocs } from "firebase/firestore"; // ✅ added query, where, getDocs
-import { db } from "@/lib/firebase";
+import { createBooking, getBookingsForDate } from "@/lib/firestore";
+import { format } from "date-fns";
 
-export default function CreateBookingPage() {
+const hourOptions = [
+  "07:00", "08:00", "09:00", "10:00", "11:00", "12:00",
+  "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
+];
+
+export function generateTimeSlots(start: string, end: string): string[] {
+  const startHour = parseInt(start.split(":")[0]);
+  const endHour = parseInt(end.split(":")[0]);
+
+  const slots: string[] = [];
+  for (let hour = startHour; hour < endHour; hour++) {
+    const from = `${hour.toString().padStart(2, "0")}:00`;
+    const to = `${(hour + 1).toString().padStart(2, "0")}:00`;
+    slots.push(`${from} - ${to}`);
+  }
+
+  return slots;
+}
+
+
+export default function CreateBookingForm() {
   const router = useRouter();
-  const [unavailableSlots, setUnavailableSlots] = useState<string[]>([]);
+  const [vanSize, setVanSize] = useState<"large" | "small">("small");
+  const [date, setDate] = useState("");
+  const [userInitials, setUserInitials] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [bookedSlots, setBookedSlots] = useState<string[]>([]);
 
-  const [form, setForm] = useState({
-    vanSize: "",
-    date: "",
-    timeSlot: "",
-    userInitials: "",
-  });
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  
   useEffect(() => {
-    const fetchUnavailableSlots = async () => {
-      if (!form.date || !form.vanSize) {
-        setUnavailableSlots([]);
-        return;
-      }
+    const fetchBookings = async () => {
+      if (!date || !vanSize) return;
 
-      const q = query(
-        collection(db, "bookings"),
-        where("date", "==", form.date),
-        where("vanSize", "==", form.vanSize)
-      );
+      const bookings = await getBookingsForDate(date);
+      const relevant = bookings.filter((b) => b.vanSize === vanSize);
 
-      const snapshot = await getDocs(q);
-      const slots = snapshot.docs.map((doc) => doc.data().timeSlot);
-      setUnavailableSlots(slots);
+      const taken = relevant.flatMap((b) => b.timeSlots); // Now always an array
+
+      setBookedSlots(taken);
     };
-
-    fetchUnavailableSlots();
-  }, [form.date, form.vanSize]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-  };
+    fetchBookings();
+  }, [date, vanSize]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+  e.preventDefault();
 
-    if (!form.vanSize || !form.date || !form.userInitials) {
-      setError("Please fill in van size, date, and your initials.");
-      setLoading(false);
-      return;
-    }
+  if (!vanSize || !date || !userInitials || !startTime || !endTime) {
+    alert("Please fill out all fields");
+    return;
+  }
 
-    try {
-      await addDoc(collection(db, "bookings"), {
-        vanSize: form.vanSize,
-        date: form.date,
-        timeSlot: form.timeSlot,
-        userInitials: form.userInitials.toUpperCase(),
-      });
+  const timeSlots = generateTimeSlots(startTime, endTime); // e.g., ["07:00 - 08:00", "08:00 - 09:00"]
 
+  // Convert new booking to individual hours
+  const newHours = timeSlots.map(slot => slot.split(" - ")[0]); // ["07:00", "08:00"]
 
-      router.push("/bookings");
-    } catch (error) {
-      setError("Failed to create booking. Please try again.");
-      console.error("Error adding booking: ", error);
-    } finally {
-      setLoading(false);
-    }
+  const bookings = await getBookingsForDate(date);
+  const relevant = bookings.filter((b) => b.vanSize === vanSize);
+
+  // Convert all existing bookings to individual hours
+  const takenHours = new Set(
+    relevant.flatMap(b =>
+      b.timeSlots.map(slot => slot.split(" - ")[0]) // ["08:00", "09:00"]
+    )
+  );
+
+  // Check for any overlap
+  const hasClash = newHours.some(hour => takenHours.has(hour));
+  if (hasClash) {
+    alert("This time slot overlaps with an existing booking. Please choose a different time.");
+    return;
+  }
+
+  const newBooking = {
+    vanSize,
+    date,
+    userInitials,
+    timeSlots,
   };
 
+  try {
+    await createBooking(newBooking);
+    alert("Booking created!");
+    router.push("/bookings");
+  } catch (error) {
+    console.error("Error creating booking:", error);
+    alert("Failed to create booking.");
+  }
+};
+
+const getAvailableEndTimes = () => {
+  if (!startTime) return [];
+
+  const startIndex = hourOptions.indexOf(startTime);
+  if (startIndex === -1) return [];
+
+  // Flatten booked time slots into a Set of hours
+  const blockedHours = new Set(
+    bookedSlots.flatMap(slot => {
+      const [start, end] = slot.split(" - ");
+      const startIdx = hourOptions.indexOf(start);
+      const endIdx = hourOptions.indexOf(end);
+      return hourOptions.slice(startIdx, endIdx); // e.g., "08:00", "09:00"
+    })
+  );
+
+  // Now return only end times that would not overlap
+  const availableEndTimes: string[] = [];
+
+  for (let i = startIndex + 1; i < hourOptions.length; i++) {
+    const range = hourOptions.slice(startIndex, i); // proposed time range
+    const hasConflict = range.some(hour => blockedHours.has(hour));
+    if (hasConflict) break; // stop at the first conflict
+    availableEndTimes.push(hourOptions[i]);
+  }
+
+  return availableEndTimes;
+};
+
+
   return (
-    <main className="max-w-md mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">Create Booking</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Van size select (unchanged) */}
-        <div>
-          <label htmlFor="vanSize" className="block font-medium mb-1">
-            Select Van Size
-          </label>
-          <select
-            name="vanSize"
-            id="vanSize"
-            value={form.vanSize}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-          >
-            <option value="">-- Select Van Size --</option>
-            <option value="large">Large</option>
-            <option value="small">Small</option>
-          </select>
-        </div>
+    <main className="max-w-md mx-auto p-2">
+      <h1 className="text-2xl font-bold mb-1">Create Booking</h1>
+    
+    <form onSubmit={handleSubmit} className="space-y-4 max-w-md">
+      <div>
+        <label className="block mb-1">Van Size:</label>
+        <select value={vanSize} onChange={(e) => setVanSize(e.target.value as "small" | "large")} className="border p-2 w-full">
+          <option value="small">Small</option>
+          <option value="large">Large</option>
+        </select>
+      </div>
 
-        {/* Date picker input */}
-        <div>
-          <label htmlFor="date" className="block font-medium mb-1">
-            Date
-          </label>
-          <input
-            type="date"
-            name="date"
-            id="date"
-            value={form.date}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-          />
-        </div>
+      <div>
+        <label className="block mb-1">Date:</label>
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          className="border p-2 w-full"
+        />
+      </div>
 
-        {/* Time slot dropdown */}
-        <div>
-          <label htmlFor="timeSlot" className="block font-medium mb-1">
-            Time Slot
-          </label>
-          <select
-            name="timeSlot"
-            id="timeSlot"
-            value={form.timeSlot}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded"
-          >
-            <option value="">-- Select Time Slot --</option>
-            {[
-              "07:00-08:00",
-              "08:00-09:00",
-              "09:00-10:00",
-              "10:00-11:00",
-              "11:00-12:00",
-              "12:00-13:00",
-              "13:00-14:00",
-              "14:00-15:00",
-              "15:00-16:00",
-              "16:00-17:00",
-              "17:00-18:00",
-              "18:00-19:00",
-            ].map((slot) => (
-              <option key={slot} value={slot} disabled={unavailableSlots.includes(slot)} style={unavailableSlots.includes(slot) ? { color: "red" } : {}}>
-                {slot.replace("-", " - ")}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div>
+        <label className="block mb-1">User Initials:</label>
+        <input
+          type="text"
+          value={userInitials}
+          onChange={(e) => setUserInitials(e.target.value)}
+          className="border p-2 w-full"
+        />
+      </div>
 
-        {/* User initials input (unchanged) */}
-        <div>
-          <label htmlFor="userInitials" className="block font-medium mb-1">
-            Your Initials
-          </label>
-          <input
-            type="text"
-            name="userInitials"
-            id="userInitials"
-            value={form.userInitials}
-            onChange={handleChange}
-            maxLength={3}
-            className="w-full border px-3 py-2 rounded uppercase"
-            placeholder="e.g. JSM"
-          />
-        </div>
-
-        {/* Submit button */}
-        <button
-          type="submit"
-          disabled={loading}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+      <div>
+        <label className="block mb-1">Start Time:</label>
+        <select
+          value={startTime}
+          onChange={(e) => {
+            setStartTime(e.target.value);
+            setEndTime(""); // reset end time when start changes
+          }}
+          className="border p-2 w-full"
         >
-          {loading ? "Creating..." : "Create Booking"}
-        </button>
-      </form>
+          <option value="">Select...</option>
+          {hourOptions.map((hour) => {
+            const isBooked = bookedSlots.some(slot => slot.startsWith(hour));
+            return (
+              <option
+                key={hour}
+                value={hour}
+                disabled={isBooked}
+                className={isBooked ? "text-red-500" : ""}
+              >
+                {hour} {isBooked ? "(Booked)" : ""}
+              </option>
+            );
+          })}
+        </select>
 
+      </div>
+
+      <div>
+        <label className="block mb-1">End Time:</label>
+        <select
+          value={endTime}
+          onChange={(e) => setEndTime(e.target.value)}
+          className="border p-2 w-full"
+        >
+          <option value="">Select...</option>
+          {getAvailableEndTimes().map((hour) => (
+            <option key={hour} value={hour}>{hour}</option>
+          ))}
+        </select>
+      </div>
+
+      <button
+        type="submit"
+        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+      >
+        Submit Booking
+      </button>
+    </form>
     </main>
   );
 }
