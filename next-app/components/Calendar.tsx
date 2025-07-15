@@ -8,16 +8,18 @@ import {
   startOfMonth,
   endOfMonth,
   eachDayOfInterval,
-  isSameMonth,
-  startOfDay,
+  startOfDay
 } from "date-fns";
 import { getBookingsForMonthRange, deleteBooking } from "@/lib/firestore";
 import type { Booking } from "@/app/types/Booking";
-import { getAuth } from "firebase/auth";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { useRouter } from "next/navigation";
+import { db } from "@/lib/firebase";
 
 const COLORS: Record<string, string> = {
   large: "bg-blue-200",
-  small: "bg-green-200",
+  small: "bg-green-200"
 };
 
 function formatTimeTo12Hour(time: string) {
@@ -33,22 +35,51 @@ export default function Calendar() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const router = useRouter();
 
+  // 🔐 Auto-create Firestore user doc if missing
   useEffect(() => {
-    const fetchUserAndBookings = async () => {
-      const auth = getAuth();
-      const user = auth.currentUser;
-      setCurrentUserId(user?.uid || null);
+    const auth = getAuth();
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const uid = user.uid;
+        setCurrentUserId(uid);
 
+        const userDocRef = doc(db, "users", uid);
+        const userDoc = await getDoc(userDocRef);
+
+        if (!userDoc.exists()) {
+          await setDoc(userDocRef, {
+            email: user.email,
+            role: "basic"
+          });
+          console.log("🆕 New user document created:", user.email);
+          setCurrentUserRole("basic");
+        } else {
+          const role = userDoc.data().role || "basic";
+          console.log("✅ Fetched user role from Firestore:", role);
+          setCurrentUserRole(role);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // 📅 Load bookings
+  useEffect(() => {
+    const fetchBookings = async () => {
       const start = startOfMonth(currentMonth);
       const end = endOfMonth(addMonths(currentMonth, 2));
       const data = await getBookingsForMonthRange(start, end);
       setBookings(data);
     };
 
-    fetchUserAndBookings();
+    fetchBookings();
   }, [currentMonth]);
 
+  // ❌ Delete booking
   const handleDelete = async (id: string) => {
     const confirmDelete = confirm("Are you sure you want to delete this booking?");
     if (!confirmDelete) return;
@@ -62,6 +93,7 @@ export default function Calendar() {
     }
   };
 
+  // 📊 Group bookings by date
   const groupedBookings = bookings.reduce<Record<string, Booking[]>>((acc, booking) => {
     if (!acc[booking.date]) acc[booking.date] = [];
     acc[booking.date].push(booking);
@@ -70,22 +102,34 @@ export default function Calendar() {
 
   return (
     <div className="space-y-8">
-      {/* Month navigation */}
-      <div className="flex justify-end gap-2 mb-4">
-        <button
-          onClick={() => setCurrentMonth((prev) => subMonths(prev, 3))}
-          className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
-        >
-          -3 Months
-        </button>
-        <button
-          onClick={() => setCurrentMonth((prev) => addMonths(prev, 3))}
-          className="bg-gray-900 text-white px-4 py-2 rounded hover:bg-indigo-700"
-        >
-          +3 Months
-        </button>
+      {/* 📅 Navigation + 🛠️ Uber-only Settings Button */}
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setCurrentMonth((prev) => subMonths(prev, 3))}
+            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+          >
+            -3 Months
+          </button>
+          <button
+            onClick={() => setCurrentMonth((prev) => addMonths(prev, 3))}
+            className="bg-gray-900 text-white px-4 py-2 rounded hover:bg-indigo-700"
+          >
+            +3 Months
+          </button>
+        </div>
+
+        {currentUserRole === "uber" && (
+          <button
+            onClick={() => router.push("/settings")}
+            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+          >
+            Manage Users
+          </button>
+        )}
       </div>
 
+      {/* 🗓️ Render calendar months */}
       {[0, 1, 2].map((offset) => {
         const monthStart = startOfMonth(addMonths(currentMonth, offset));
         const monthEnd = endOfMonth(monthStart);
@@ -93,20 +137,15 @@ export default function Calendar() {
 
         return (
           <div key={offset}>
-            <h2 className="text-xl font-bold mb-4">
-              {format(monthStart, "MMMM yyyy")}
-            </h2>
+            <h2 className="text-xl font-bold mb-4">{format(monthStart, "MMMM yyyy")}</h2>
 
-            {/* Day names header */}
             <div className="grid grid-cols-7 gap-4 text-center font-medium text-gray-700 mb-2">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
                 <div key={day}>{day}</div>
               ))}
             </div>
 
-            {/* Calendar grid */}
             <div className="grid grid-cols-7 gap-4">
-              {/* Padding for first day of the month */}
               {Array.from({ length: monthStart.getDay() }).map((_, i) => (
                 <div key={`pad-${i}`} />
               ))}
@@ -133,8 +172,6 @@ export default function Calendar() {
                           return aStart.localeCompare(bStart);
                         })
                         .map((booking) => {
-                          console.log("Booking userId:", booking.userId);
-                          console.log("Current userId:", currentUserId);
                           const isMine = booking.userId === currentUserId;
 
                           return (
