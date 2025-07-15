@@ -4,4 +4,6 @@ export type Booking = {
   date: string;
   userInitials: string;
   timeSlots: string[]; // ← no more timeSlot
+  userId: string; // ← ✅ Add this field
+
 };

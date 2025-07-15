@@ -13,6 +13,7 @@ import {
 } from "date-fns";
 import { getBookingsForMonthRange, deleteBooking } from "@/lib/firestore";
 import type { Booking } from "@/app/types/Booking";
+import { getAuth } from "firebase/auth";
 
 const COLORS: Record<string, string> = {
   large: "bg-blue-200",
@@ -31,16 +32,21 @@ function formatTimeTo12Hour(time: string) {
 export default function Calendar() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchBookings = async () => {
+    const fetchUserAndBookings = async () => {
+      const auth = getAuth();
+      const user = auth.currentUser;
+      setCurrentUserId(user?.uid || null);
+
       const start = startOfMonth(currentMonth);
       const end = endOfMonth(addMonths(currentMonth, 2));
       const data = await getBookingsForMonthRange(start, end);
       setBookings(data);
     };
 
-    fetchBookings();
+    fetchUserAndBookings();
   }, [currentMonth]);
 
   const handleDelete = async (id: string) => {
@@ -52,6 +58,7 @@ export default function Calendar() {
       setBookings((prev) => prev.filter((b) => b.id !== id));
     } catch (error) {
       console.error("Failed to delete booking:", error);
+      alert("Delete failed. You may not have permission to delete this booking.");
     }
   };
 
@@ -125,39 +132,50 @@ export default function Calendar() {
                           const bStart = b.timeSlots[0]?.split(" - ")[0] || "00:00";
                           return aStart.localeCompare(bStart);
                         })
-                        .map((booking) => (
-                          <div
-                            key={booking.id}
-                            className={`flex justify-between items-start text-sm px-2 py-1 rounded ${COLORS[booking.vanSize]}`}
-                          >
-                            <div>
-                              {booking.vanSize.charAt(0).toUpperCase() + booking.vanSize.slice(1)} –{" "}
-                              {booking.userInitials}
-                              <div className="text-xs text-gray-700">
-                                {Array.isArray(booking.timeSlots) && booking.timeSlots.length > 0 ? (
-                                  (() => {
-                                    const firstSlot = booking.timeSlots[0];
-                                    const lastSlot = booking.timeSlots[booking.timeSlots.length - 1];
-                                    const startTime = firstSlot.split(" - ")[0];
-                                    const endTime = lastSlot.split(" - ")[1];
-                                    return `${formatTimeTo12Hour(startTime)} - ${formatTimeTo12Hour(endTime)}`;
-                                  })()
-                                ) : (
-                                  ""
-                                )}
-                              </div>
-                            </div>
+                        .map((booking) => {
+                          console.log("Booking userId:", booking.userId);
+                          console.log("Current userId:", currentUserId);
+                          const isMine = booking.userId === currentUserId;
 
-                            <button
-                              onClick={() => handleDelete(booking.id)}
-                              className="ml-2 text-red-600 hover:text-red-800 font-bold text-lg leading-none"
-                              aria-label="Delete booking"
-                              type="button"
+                          return (
+                            <div
+                              key={booking.id}
+                              className={`flex justify-between items-start text-sm px-2 py-1 rounded ${
+                                COLORS[booking.vanSize]
+                              } ${isMine ? "border border-black shadow-sm" : ""}`}
                             >
-                              ×
-                            </button>
-                          </div>
-                        ))}
+                              <div>
+                                {booking.vanSize.charAt(0).toUpperCase() + booking.vanSize.slice(1)} –{" "}
+                                {booking.userInitials}
+                                {isMine && (
+                                  <span className="text-xs text-gray-800 ml-1">(You)</span>
+                                )}
+                                <div className="text-xs text-gray-700">
+                                  {Array.isArray(booking.timeSlots) && booking.timeSlots.length > 0
+                                    ? (() => {
+                                        const firstSlot = booking.timeSlots[0];
+                                        const lastSlot = booking.timeSlots[booking.timeSlots.length - 1];
+                                        const startTime = firstSlot.split(" - ")[0];
+                                        const endTime = lastSlot.split(" - ")[1];
+                                        return `${formatTimeTo12Hour(startTime)} - ${formatTimeTo12Hour(endTime)}`;
+                                      })()
+                                    : ""}
+                                </div>
+                              </div>
+
+                              {isMine && (
+                                <button
+                                  onClick={() => handleDelete(booking.id)}
+                                  className="ml-2 text-red-600 hover:text-red-800 font-bold text-lg leading-none"
+                                  aria-label="Delete booking"
+                                  type="button"
+                                >
+                                  ×
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
                 );
