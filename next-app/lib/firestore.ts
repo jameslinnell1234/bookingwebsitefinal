@@ -77,8 +77,8 @@ export async function createBooking(booking: {
   vanSize: "large" | "small";
   date: string;
   userInitials: string;
-  
   timeSlots?: string[];
+  
 }): Promise<void> {
   const bookingsRef = collection(db, "bookings");
   await addDoc(bookingsRef, booking);

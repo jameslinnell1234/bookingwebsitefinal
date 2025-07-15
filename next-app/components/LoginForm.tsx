@@ -1,68 +1,81 @@
+// components/LoginForm.tsx
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
+import { auth } from "@/lib/firebase"; // adjust the path if needed
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 
-const LoginForm = () => {
-  const router = useRouter();
+export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+  const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      router.push("/bookings"); // or wherever your protected page is
+    } catch (err: any) {
+      setError(err.message || "Failed to log in");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Dummy test user
-    const testUser = {
-      email: "test@example.com",
-      password: "password123",
-    };
-
-    if (email === testUser.email && password === testUser.password) {
-      router.push("/bookings");
-    } else {
-      setError("Invalid email or password.");
+  const handlePasswordReset = async () => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setResetSent(true);
+    } catch (err: any) {
+      setError(err.message || "Error sending reset email");
     }
   };
 
   return (
-    <>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <input
-          type="email"
-          placeholder="Email"
-          className="w-full p-2 border rounded border-gray-300"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          className="w-full p-2 border rounded border-gray-300"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-        <button
-          type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white p-2 rounded"
-        >
-          Login
-        </button>
-      </form>
+    <form onSubmit={handleLogin} className="space-y-4 max-w-sm mx-auto p-4">
+      <h2 className="text-xl font-semibold">Login</h2>
 
-      {/* Forgot Password Link */}
-      <div className="mt-4 text-center">
-        <Link
-          href="/forgot-password"
-          className="text-sm text-blue-600 hover:underline"
-        >
-          Forgot your password?
-        </Link>
-      </div>
-    </>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email"
+        className="w-full border p-2"
+        required
+      />
+      <input
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Password"
+        className="w-full border p-2"
+        required
+      />
+
+      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {resetSent && <p className="text-green-600 text-sm">Reset email sent!</p>}
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+      >
+        {loading ? "Logging in..." : "Login"}
+      </button>
+
+      <button
+        type="button"
+        onClick={handlePasswordReset}
+        className="text-sm text-blue-500 mt-2 hover:underline"
+      >
+        Forgot password?
+      </button>
+    </form>
   );
-};
-
-export default LoginForm;
+}
