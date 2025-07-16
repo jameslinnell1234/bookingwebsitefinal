@@ -8,18 +8,14 @@ import {
   startOfMonth,
   endOfMonth,
   eachDayOfInterval,
-  startOfDay
+  startOfDay,
 } from "date-fns";
 import { getBookingsForMonthRange, deleteBooking } from "@/lib/firestore";
 import type { Booking } from "@/app/types/Booking";
-import { getAuth, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { useRouter } from "next/navigation";
-import { db } from "@/lib/firebase";
 
 const COLORS: Record<string, string> = {
   large: "bg-blue-200",
-  small: "bg-green-200"
+  small: "bg-green-200",
 };
 
 function formatTimeTo12Hour(time: string) {
@@ -31,43 +27,16 @@ function formatTimeTo12Hour(time: string) {
   return `${hour}${ampm}`;
 }
 
-export default function Calendar() {
+export default function Calendar({
+  currentUserId,
+  currentUserRole,
+}: {
+  currentUserId: string | null;
+  currentUserRole: string | null;
+}) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date()));
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
-  const router = useRouter();
 
-  // 🔐 Auto-create Firestore user doc if missing
-  useEffect(() => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const uid = user.uid;
-        setCurrentUserId(uid);
-
-        const userDocRef = doc(db, "users", uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (!userDoc.exists()) {
-          await setDoc(userDocRef, {
-            email: user.email,
-            role: "basic"
-          });
-          console.log("🆕 New user document created:", user.email);
-          setCurrentUserRole("basic");
-        } else {
-          const role = userDoc.data().role || "basic";
-          console.log("✅ Fetched user role from Firestore:", role);
-          setCurrentUserRole(role);
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, []);
-
-  // 📅 Load bookings
   useEffect(() => {
     const fetchBookings = async () => {
       const start = startOfMonth(currentMonth);
@@ -79,7 +48,6 @@ export default function Calendar() {
     fetchBookings();
   }, [currentMonth]);
 
-  // ❌ Delete booking
   const handleDelete = async (id: string) => {
     const confirmDelete = confirm("Are you sure you want to delete this booking?");
     if (!confirmDelete) return;
@@ -93,7 +61,6 @@ export default function Calendar() {
     }
   };
 
-  // 📊 Group bookings by date
   const groupedBookings = bookings.reduce<Record<string, Booking[]>>((acc, booking) => {
     if (!acc[booking.date]) acc[booking.date] = [];
     acc[booking.date].push(booking);
@@ -102,34 +69,23 @@ export default function Calendar() {
 
   return (
     <div className="space-y-8">
-      {/* 📅 Navigation + 🛠️ Uber-only Settings Button */}
-      <div className="flex justify-between items-center mb-4">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setCurrentMonth((prev) => subMonths(prev, 3))}
-            className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
-          >
-            -3 Months
-          </button>
-          <button
-            onClick={() => setCurrentMonth((prev) => addMonths(prev, 3))}
-            className="bg-gray-900 text-white px-4 py-2 rounded hover:bg-indigo-700"
-          >
-            +3 Months
-          </button>
-        </div>
-
-        {currentUserRole === "uber" && (
-          <button
-            onClick={() => router.push("/settings")}
-            className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-          >
-            Manage Users
-          </button>
-        )}
+      {/* 🔁 Month Navigation */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setCurrentMonth((prev) => subMonths(prev, 3))}
+          className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+        >
+          -3 Months
+        </button>
+        <button
+          onClick={() => setCurrentMonth((prev) => addMonths(prev, 3))}
+          className="bg-gray-900 text-white px-4 py-2 rounded hover:bg-gray-800"
+        >
+          +3 Months
+        </button>
       </div>
 
-      {/* 🗓️ Render calendar months */}
+      {/* 📅 Render 3 months */}
       {[0, 1, 2].map((offset) => {
         const monthStart = startOfMonth(addMonths(currentMonth, offset));
         const monthEnd = endOfMonth(monthStart);
@@ -182,19 +138,24 @@ export default function Calendar() {
                               } ${isMine ? "border border-black shadow-sm" : ""}`}
                             >
                               <div>
-                                {booking.vanSize.charAt(0).toUpperCase() + booking.vanSize.slice(1)} –{" "}
-                                {booking.userInitials}
+                                {booking.vanSize.charAt(0).toUpperCase() +
+                                  booking.vanSize.slice(1)}{" "}
+                                – {booking.userInitials}
                                 {isMine && (
                                   <span className="text-xs text-gray-800 ml-1">(You)</span>
                                 )}
                                 <div className="text-xs text-gray-700">
-                                  {Array.isArray(booking.timeSlots) && booking.timeSlots.length > 0
+                                  {Array.isArray(booking.timeSlots) &&
+                                  booking.timeSlots.length > 0
                                     ? (() => {
                                         const firstSlot = booking.timeSlots[0];
-                                        const lastSlot = booking.timeSlots[booking.timeSlots.length - 1];
+                                        const lastSlot =
+                                          booking.timeSlots[booking.timeSlots.length - 1];
                                         const startTime = firstSlot.split(" - ")[0];
                                         const endTime = lastSlot.split(" - ")[1];
-                                        return `${formatTimeTo12Hour(startTime)} - ${formatTimeTo12Hour(endTime)}`;
+                                        return `${formatTimeTo12Hour(
+                                          startTime
+                                        )} - ${formatTimeTo12Hour(endTime)}`;
                                       })()
                                     : ""}
                                 </div>
