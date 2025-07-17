@@ -1,30 +1,23 @@
-name: Deploy to Firebase App Hosting
+- name: Setup Node.js
+  uses: actions/setup-node@v3
+  with:
+    node-version: 18
 
-on:
-  push:
-    branches:
-      - main  # or your chosen branch
+- name: Install deps
+  run: |
+    cd app
+    npm install
 
-jobs:
-  build_and_deploy:
-    runs-on: ubuntu-latest
+- name: Build & export
+  run: |
+    cd app
+    npm run build
+    npm run export
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build Next.js app
-        run: npm run build
-
-      - name: Start Next.js server
-        run: npm run start
-        env:
-          PORT: 8080
+- name: Deploy to Firebase
+  uses: FirebaseExtended/action-hosting-deploy@v0
+  with:
+    repoToken: "${{ secrets.GITHUB_TOKEN }}"
+    firebaseServiceAccount: "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}"
+    channelId: live
+    projectId: your-firebase-project-id
