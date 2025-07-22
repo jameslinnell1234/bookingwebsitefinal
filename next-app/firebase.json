@@ -41,5 +41,16 @@
       "firebase-debug.*.log",
       "functions"
     ]
+  },
+  "hosting": {
+    "site": "minibus-booking-website",
+    "public": "public",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      {
+        "source": "**",
+        "function": "nextApp"
+      }
+    ]
   }
 }
