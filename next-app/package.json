@@ -24,15 +24,8 @@
     "eslint-config-next": "15.3.4",
     "@eslint/eslintrc": "^3"
   }
-    "hosting": {
-    "site": "minibus-booking-website",
-    "public": "public",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      {
-        "source": "**",
-        "function": "nextApp"
-      }
-    ]
-  }
+  
+ 
+  
 }
+
