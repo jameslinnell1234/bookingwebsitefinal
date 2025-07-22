@@ -1,9 +1,10 @@
 build:
   command: npm install && npm run build
-  workingDir: next-app
+  workingDir: ./
 
 serve:
   command: node .next/standalone/server.js
-  workingDir: next-app
+  workingDir: ./
   env:
     PORT: 8080
+
