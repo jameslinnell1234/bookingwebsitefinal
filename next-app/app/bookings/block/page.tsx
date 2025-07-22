@@ -9,7 +9,6 @@ import {
   format,
   eachDayOfInterval,
   parseISO,
-  startOfDay,
 } from "date-fns";
 
 function generateTimeSlots(start: string, end: string): string[] {
@@ -123,7 +122,7 @@ export default function RecurringBookingPage() {
 
     const available = allSlots.filter(slot => {
       const conflictCount = Object.entries(slotCounts).filter(
-        ([bookedSlot, count]) => doesOverlap(slot, bookedSlot)
+        ([bookedSlot]) => doesOverlap(slot, bookedSlot)
       ).reduce((sum, [, count]) => sum + count, 0);
       return conflictCount < totalDays;
     });
@@ -154,7 +153,7 @@ export default function RecurringBookingPage() {
       end: parseISO(endDate),
     });
 
-    let skippedDates: string[] = [];
+    const skippedDates: string[] = [];
 
     for (const dateObj of dates) {
       const day = dateObj.getDay().toString();

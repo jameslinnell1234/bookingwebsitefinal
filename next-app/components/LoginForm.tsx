@@ -21,20 +21,28 @@ export default function LoginForm() {
     try {
       await signInWithEmailAndPassword(auth, email, password);
       router.push("/bookings"); // or wherever your protected page is
-    } catch (err: any) {
-      setError(err.message || "Failed to log in");
-    } finally {
-      setLoading(false);
-    }
+    } catch (err: unknown) {
+  if (err instanceof Error) {
+    setError(err.message || "Failed to log in");
+  } else {
+    setError("Failed to log in");
+  }
+}
+
   };
 
   const handlePasswordReset = async () => {
     try {
       await sendPasswordResetEmail(auth, email);
       setResetSent(true);
-    } catch (err: any) {
-      setError(err.message || "Error sending reset email");
-    }
+    } catch (err: unknown) {
+  if (err instanceof Error) {
+    setError(err.message || "Error sending reset email");
+  } else {
+    setError("Error sending reset email");
+  }
+}
+
   };
 
   return (

@@ -1,6 +1,0 @@
-build:
-  command: npm install && npm run build
-  workingDir: next-app
-serve:
-  command: npm start
-  workingDir: next-app

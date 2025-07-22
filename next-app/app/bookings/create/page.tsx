@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBooking, getBookingsForDate } from "@/lib/firestore";
-import { format } from "date-fns";
+import { generateTimeSlots } from "./utils";
 
 
 
@@ -12,19 +12,7 @@ const hourOptions = [
   "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00"
 ];
 
-export function generateTimeSlots(start: string, end: string): string[] {
-  const startHour = parseInt(start.split(":")[0]);
-  const endHour = parseInt(end.split(":")[0]);
 
-  const slots: string[] = [];
-  for (let hour = startHour; hour < endHour; hour++) {
-    const from = `${hour.toString().padStart(2, "0")}:00`;
-    const to = `${(hour + 1).toString().padStart(2, "0")}:00`;
-    slots.push(`${from} - ${to}`);
-  }
-
-  return slots;
-}
 
 
 export default function CreateBookingForm() {

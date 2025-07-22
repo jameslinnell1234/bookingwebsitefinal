@@ -29,7 +29,7 @@ function formatTimeTo12Hour(time: string) {
 
 export default function Calendar({
   currentUserId,
-  currentUserRole,
+  
 }: {
   currentUserId: string | null;
   currentUserRole: string | null;
