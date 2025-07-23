@@ -3,7 +3,7 @@ build:
   workingDir: ./
 
 serve:
-  command: node .next/standalone/server.js
+  command: node custom-server.js
   workingDir: ./
   env:
     PORT: 8080
